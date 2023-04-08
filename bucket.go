@@ -32,15 +32,13 @@ func (b *Bucket) Add(t *Timer) {
 	b.mu.Lock()
 
 	e := b.timers.PushBack(t)
+	t.SetBucket(b)
 	t.element = e
 
 	b.mu.Unlock()
 }
 
-func (b *Bucket) Remove(t *Timer) bool {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
+func (b *Bucket) remove(t *Timer) bool {
 	if t.GetBucket() != b {
 		return false
 	}
@@ -51,13 +49,19 @@ func (b *Bucket) Remove(t *Timer) bool {
 	return true
 }
 
+func (b *Bucket) Remove(t *Timer) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.remove(t)
+}
+
 func (b *Bucket) Flush(reinsert func(*Timer)) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	for e := b.timers.Front(); e != nil; e = e.Next() {
+	for i, e := b.timers.Len(), b.timers.Front(); i > 0; i, e = i-1, e.Next() {
 		t := e.Value.(*Timer)
-		b.Remove(t)
+		b.remove(t)
 
 		// reinsert time : run or add to a lower-level wheel
 		reinsert(t)
